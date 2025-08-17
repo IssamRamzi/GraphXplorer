@@ -38,7 +38,7 @@ public:
         file.close();
     }
 
-    void Log(LOG_LEVEL level, std::string message, ...) {
+    void Log(LOG_LEVEL level, std::string message) {
         // time - level - message
         time_t now = time(0);
         tm* timeinfo = localtime(&now);
