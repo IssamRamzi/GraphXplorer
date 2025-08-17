@@ -7,16 +7,13 @@
 #include "Renderer.h"
 #include "UIManager.h"
 #include "Graph.h"
-
-#define         FPS 60
-const Color     BgColor = {23,23,23,255};
-const Color     TextColor = {220, 220, 220, 255};
+#include "utils.h"
 
 class Application
 {
 private:
     int m_width, m_height;
-    char* m_title;
+    std::string m_title;
 
 
     struct Renderer renderer;
@@ -26,7 +23,7 @@ private:
 
 public:
 
-    Application(int width, int height,char* title);
+    Application(int width, int height, std::string title);
     ~Application(); 
 
     void Init();

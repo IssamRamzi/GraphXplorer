@@ -2,3 +2,4 @@
 .\.vscode
 ./buid
 ./out
+./cmake-build-debug

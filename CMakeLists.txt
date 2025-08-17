@@ -1,41 +1,60 @@
-﻿cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.8)
+project("GraphXplorer")
 
-project ("GraphXplorer")
+set(CMAKE_CXX_STANDARD 20)
 
-
-# Dependencies
-set(RAYLIB_VERSION 4.2.0)
-find_package(raylib ${RAYLIB_VERSION} QUIET) 
-if (NOT raylib_FOUND) # If there's none, fetch and build raylib
+# ----------------------
+# Fetch raylib
+# ----------------------
+set(RAYLIB_VERSION 5.5)
+find_package(raylib ${RAYLIB_VERSION} QUIET)
+if (NOT raylib_FOUND)
     include(FetchContent)
     FetchContent_Declare(
-            raylib
-            URL https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz
+        raylib
+        URL https://github.com/raysan5/raylib/archive/refs/tags/${RAYLIB_VERSION}.tar.gz
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    
     )
     FetchContent_GetProperties(raylib)
-    if (NOT raylib_POPULATED) # Have we downloaded raylib yet?
+    if (NOT raylib_POPULATED)
         set(FETCHCONTENT_QUIET NO)
         FetchContent_Populate(raylib)
-        set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE) # don't build the supplied examples
+        set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
         add_subdirectory(${raylib_SOURCE_DIR} ${raylib_BINARY_DIR})
     endif()
 endif()
 
+# ----------------------
+# Fetch raygui
+# ----------------------
+include(FetchContent)
+FetchContent_Declare(
+    raygui
+    URL https://github.com/raysan5/raygui/archive/refs/tags/4.0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(raygui)
 
+# ----------------------
+# Create executable
+# ----------------------
+add_executable(GraphXplorer
+    main.cpp
+    src/Application.cpp
 
-add_executable (GraphXplorer
-  "main.cpp"
-  "src/Application.cpp"
 )
 
-target_link_libraries(${PROJECT_NAME} raylib)
-
-include_directories(
-    "${CMAKE_SOURCE_DIR}" 
-    "src/headers"
+# ----------------------
+# Include directories
+# ----------------------
+target_include_directories(GraphXplorer PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    src/headers
+    ${raygui_SOURCE_DIR}/src
 )
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET GraphXplorer PROPERTY CXX_STANDARD 20)
-endif()
-
+# ----------------------
+# Link libraries
+# ----------------------
+target_link_libraries(GraphXplorer PRIVATE raylib)
