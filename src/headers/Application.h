@@ -30,6 +30,5 @@ public:
     void Run();
     void Close();
 
-    inline Graph<int>* GetGraph() const { return graph; }
 };
 

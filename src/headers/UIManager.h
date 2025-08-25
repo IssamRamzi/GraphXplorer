@@ -6,6 +6,7 @@
 
 #include <deque>
 
+#include "AudioManager.h"
 #include "thirdparty/style_dark_raygui.h"
 #include "IO.h"
 
@@ -15,19 +16,25 @@ class UIManager
 private:
     Graph<T>* graph;
     Node<T>* selected_node = nullptr;
+    Edge<T>* selected_edge = nullptr;
     Vector2 mousePosition;
     Camera2D camera;
     Node<T>* dragging_node = nullptr;
     bool dragging = false;
     IO *io;
+    AudioManager audiomanager;
+    GZones zones;
+    Vector2 panelScroll = { 0, 0 };
 
-    std::deque<std::string> logs;
+    char* weight_ = "0.000vf";
 
-    
 public:
+
+    inline Graph<int>* GetGraph() const { return graph; }
 
 
     UIManager(Graph<T>* graph) : graph(graph) {
+        audiomanager.Init("./audios");
         camera.target = { 0.f, 0.f };
         camera.offset = { GetRenderWidth() / 2.0f, GetRenderHeight() / 2.0f };
         camera.rotation = 0.0f;
@@ -44,15 +51,11 @@ public:
     }
 
     void DrawUI(){
-        GZones zones;
         // ! Menu
         DrawText("GraphXplorer", 20, 30, GSizes::TITLE_TEXT_SIZE, GColors::NODE_TEXT_COLOR);
         DrawLine(GZones::MenuWidth, 0, GZones::MenuWidth, GetScreenHeight(), WHITE);
 
-        // toggle weight
-        // bool toggleState = ;
         ToggleWeight();
-        // std::cout << "Active Weight : " << Edge<T>::activeWeight << std::endl;
 
         //reset btn
         Rectangle resetRec = { 40 , (float)GetScreenHeight() - 80.f, 150, 60};
@@ -67,13 +70,33 @@ public:
         GuiSlider((Rectangle){ zones.DrawZone.x + zones.DrawZone.width - 200, 50, 175, 16 }, TextFormat("Zoom %0.2f", camera.zoom), NULL, &camera.zoom, 0.0f, 1.0f);
 
 
-        // ! Terminal 
+        // ! Terminal
+        std::deque<std::string> logHistory = logger.GetLogHistory();
+
         DrawLine(GZones::MenuWidth, GetScreenHeight() - zones.TerminalHeight, GetScreenWidth(), GetScreenHeight() - zones.TerminalHeight, WHITE);
         Rectangle panelRec = { zones.MenuWidth,(float)GetScreenHeight() - (float)zones.TerminalHeight, (float)GetScreenWidth() - GZones::MenuWidth, zones.TerminalHeight };
-        Rectangle panelContentRec = {0, 0, 340, 340 };
+        float contentHeight = logHistory.size() * 20.0f; // 20px par ligne
+        Rectangle panelContentRec = {0, 0, panelRec.width - 20, contentHeight};
         Rectangle panelView = { 0 };
-        Vector2 panelScroll = { 99, -20 };
-        GuiScrollPanel(panelRec, NULL, panelContentRec, &panelScroll, &panelView);
+        GuiScrollPanel(panelRec, "Logs", panelContentRec, &panelScroll, &panelView);
+
+        BeginScissorMode(panelView.x, panelView.y, panelView.width, panelView.height);
+
+        for (size_t i = 0; i < logHistory.size(); i++) {
+            float yPos = panelRec.y + 5 + (i * 20) - panelScroll.y;
+            if (yPos + 20 >= panelRec.y && yPos <= panelRec.y + panelRec.height) {
+                DrawText(logHistory[i].c_str(),
+                         panelRec.x + 5 - panelScroll.x,
+                         yPos,
+                         16, GColors::DEFAULT_NODE_COLOR);
+            }
+            while (logHistory.size() > 15) { // TODO : FIX
+                logHistory.pop_front();
+            }
+        }
+
+        EndScissorMode();
+
 
     }
 
@@ -81,20 +104,22 @@ public:
         Rectangle toggleRec = { 40 , 80, 150, 60};
         GuiToggle(toggleRec, "Toggle Weight", &Edge<T>::activeWeight); // TODO : Transform this into a GuiToggleSlider
 
-        if (IsKeyPressed(KEY_W)) {
+        if (IsKeyPressed(KEY_Z)) {
             Edge<T>::activeWeight = !Edge<T>::activeWeight;
         }
     }
     
-
     void HandleEvent() {
+
         GZones zones;
         
         mousePosition = GetScreenToWorld2D(GetMousePosition(), camera);
         //initialize
         if(CheckCollisionPointRec(mousePosition, zones.DrawZone)){
             // std::cout << "In Draw Zone" << std::endl;
-            HandleHover();
+            HandleNodeHover();
+            HandleEdgeSelect();
+
             HandleCreateProcess();
             HandleCreateEdge();
             HandleDragProcess();
@@ -119,6 +144,7 @@ public:
 
     }
 
+
     void HandleFileOperations(){
         if(IsKeyPressed(KEY_S) && IsKeyDown(KEY_LEFT_CONTROL)){
             if (graph->GetNodes().size() > 0 && graph->GetEdges().size() > 0 ){
@@ -128,58 +154,50 @@ public:
         }
         if (IsKeyPressed(KEY_L) && IsKeyDown(KEY_LEFT_CONTROL)) {
             Graph<T>* nGraph = new Graph<T>();
+            Reset();
             if (io->LoadGraph("file.csv", nGraph)) {
                 if(!nGraph->IsValid()) {
-                    std::cerr << "Loaded graph is invalid!" << std::endl;
+                    logger.Log(ERROR, "Loaded graph is invalid!");
                     delete nGraph;
                     return;
                 }
-                delete graph;
                 graph = nGraph;
-                selected_node = nullptr;
-                camera.target = Vector2{0.f, 0.f};
-                camera.zoom = 1.f;
-                std::cout << "Reset Done !" << std::endl;
-                std::cout << "Loading graph successful" << std::endl;
-                // std::cout << "Nodes size " << nGraph->GetNodes().size() << std::endl;
-                std::cout << "Nodes size : " << graph->GetNodes().size() << std::endl;
-                for (auto node : graph->GetNodes()) {
-                    // std::cout << node->GetId() << std::endl;
-                    std::cout << &node << std::endl;
-                }
+                logger.Log(DEBUG, "Loading graph successful");
             } else {
                 delete nGraph;
-                std::cerr << "Failed to load graph" << std::endl;
+                logger.Log(DEBUG, "Failed to load graph");
             }
         }
     }
 
-    
     void HandleCamera() {
-        camera.zoom += GetMouseWheelMove() * 0.1f;
-        if (camera.zoom < 0.1f) camera.zoom = 0.1f;
+        if (CheckCollisionPointRec(mousePosition, zones.DrawZone)) {
+            camera.zoom += GetMouseWheelMove() * 0.1f;
+            if (camera.zoom < 0.1f) camera.zoom = 0.1f;
 
-        if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
-            Vector2 delta = GetMouseDelta();
-            delta.x *= -1.0f / camera.zoom;
-            delta.y *= -1.0f / camera.zoom;
+            if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
+                Vector2 delta = GetMouseDelta();
+                delta.x *= -1.0f / camera.zoom;
+                delta.y *= -1.0f / camera.zoom;
 
-            camera.target.x += delta.x;
-            camera.target.y += delta.y;
+                camera.target.x += delta.x;
+                camera.target.y += delta.y;
+            }
         }
+
     }
 
     void HandleFullScreen(){
         if(IsKeyPressed(KEY_F11)){
             ToggleFullscreen();
             if(IsWindowFullscreen())
-                logs.push_back("Full Screen Mode\n");
+                logger.Log(INFO, "Full Screen Mode\n");
             else
-                logs.push_back("Windowed Screen Mode\n");
+                logger.Log(INFO, "Windowed Screen Mode\n");
         }
     }
 
-    void HandleHover(){
+    void HandleNodeHover(){
         bool hovered = false;
 
         for( Node<T>* node : graph->GetNodes()){
@@ -191,11 +209,37 @@ public:
                 SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
                 node->SetColor(GColors::HOVER_NODE_COLOR);
                 hovered = true;
+
                 return;
             }
         }
         if(!hovered){
             SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+        }
+        
+    }
+
+    void HandleEdgeSelect(){
+        if(graph->GetEdges().size() > 0){
+            bool selected = false;
+            for(Edge<T> *edge : graph->GetEdges()){
+                if (IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
+                    if(utils::PointBelongsLine(edge->GetSource()->GetPosition(), edge->GetDestination()->GetPosition(), mousePosition)){
+                        selected_edge = edge;
+                        selected = true;
+                        std::cout << "Selected edge between : " << edge->GetSource()->GetId() << " and " << edge->GetDestination()->GetId() << std::endl;
+                    }
+                    else {
+                        selected_edge = nullptr;
+                    }
+                }
+
+            }
+            if (selected_edge != nullptr) {
+                Rectangle rect = {300,20, 100,60};
+
+                GuiTextBox(rect, weight_, 15, true);
+            }
         }
     }
 
@@ -218,19 +262,16 @@ public:
         else{
             // when click the empty space
             if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-
-            for(Node<T> *node : graph->GetNodes()){
-                if(node->GetDistance(mousePosition) < GSizes::MINIMUM_NODE_DISTANCE){
-                    std::cout << "too close to make another node!" << std::endl;
-                    return;
+                for(Node<T> *node : graph->GetNodes()){
+                    if(node->GetDistance(mousePosition) < GSizes::MINIMUM_NODE_DISTANCE){
+                        std::cout << "too close to make another node!" << std::endl;
+                        return;
+                    }
                 }
+                Node<T>* node = new Node<T>(Graph<T>::GetCurrentValue(), mousePosition);
+                std::cout << node << std::endl;
+                graph->AddNode(node);
             }
-            logs.push_back(std::format("Created a new node with a value of {}\n", Graph<T>::GetCurrentValue()));
-            Node<T>* node = new Node<T>(Graph<T>::GetCurrentValue(), mousePosition);
-            std::cout << node << std::endl;
-            graph->AddNode(node);
-
-        }
         }
     }
 
@@ -267,7 +308,6 @@ public:
     }
 
     void HandleDragNode(){
-
         if(IsMouseButtonDown(MOUSE_BUTTON_LEFT))
         {
             Node<T>* drag;
@@ -321,15 +361,15 @@ public:
                     if(!edgeExists){
                         Edge<T>* edge = new Edge<T>(selected_node, toLink);
                         graph->AddEdge(edge);
-                        std::cout << "Created edge from node " << selected_node->GetId() 
-                                << " to node " << toLink->GetId() << std::endl;
+                        audiomanager.Play(audiomanager.GetAudios()[0]);
+
                     } else {
-                        std::cout << "Edge already exists between these nodes" << std::endl;
+                        logger.Log(DEBUG, "Edge already exists between these nodes");
                     }
                 } else if(toLink == selected_node) {
-                    std::cout << "Cannot create edge to the same node" << std::endl;
+                    logger.Log(DEBUG, "Cannot create edge to the same node");
                 } else {
-                    std::cout << "No target node found" << std::endl;
+                    logger.Log(DEBUG,"No target node found");
                 }
                 
                 selected_node = nullptr;
@@ -342,7 +382,7 @@ public:
         selected_node = nullptr;
         camera.target = Vector2(0.f,0.f);
         camera.zoom = 1.f;
-        std::cout << "Reset Done !" << std::endl;
+        logger.Log(INFO, "Reset done !");
     }
 
     void HandleReset(){
@@ -350,7 +390,5 @@ public:
             Reset();
         }
     }
-
-
 
 };

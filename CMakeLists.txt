@@ -42,7 +42,6 @@ FetchContent_MakeAvailable(raygui)
 add_executable(GraphXplorer
     main.cpp
     src/Application.cpp
-
 )
 
 # ----------------------

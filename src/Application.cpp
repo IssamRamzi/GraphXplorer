@@ -36,7 +36,8 @@ void Application::Run(){
         ClearBackground(GColors::BACKGROUND_COLOR_DARK); 
 
         BeginMode2D(uimanager->GetCamera());
-            
+
+        graph = uimanager->GetGraph();
         if (graph && !graph->GetNodes().empty()) {
             renderer.Render(graph);
         }

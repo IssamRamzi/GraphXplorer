@@ -6,6 +6,7 @@
 
 #include "Graph.h"
 #include "Logger.h"
+#include <iostream>
 
 inline Logger logger("logs.txt");
 
@@ -18,23 +19,24 @@ struct utils
         };
     }
 
-    // template<typename T>
-    // bool SaveGraph(Graph<T> *graph){
+    static bool PointBelongsLine(Vector2 startLine, Vector2 endLine, Vector2 point){
+        // Vector from start to end
+        Vector2 lineVec = {endLine.x - startLine.x, endLine.y - startLine.y};
+        // Vector from start to point
+        Vector2 pointVec = {point.x - startLine.x, point.y - startLine.y};
 
-    //     // !
+        
+        float cross = lineVec.x * pointVec.y - lineVec.y * pointVec.x;
 
-    //     return true; 
-    // }
+        // Check if point is within the bounding box
+        if (point.x < std::min(startLine.x, endLine.x) - 1e-6 || 
+            point.x > std::max(startLine.x, endLine.x) + 1e-6 ||
+            point.y < std::min(startLine.y, endLine.y) - 1e-6 || 
+            point.y > std::max(startLine.y, endLine.y) + 1e-6)
+            return false;
 
-    // template<typename T>
-    // Graph<T>* LoadGraph(std::string filename){
-
-    //     // !
-
-    //     return nullptr; 
-    // }
-
-
+        return true;
+    }
 
 };
 

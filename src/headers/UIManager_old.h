@@ -42,11 +42,10 @@ public:
 
     }
     
-
     void HandleEvent() {
         mousePosition = GetScreenToWorld2D(GetMousePosition(), camera);
 
-        HandleHover();
+        HandleNodeHover();
 
         HandleCreateNode();
         HandleCreateEdge();
@@ -56,7 +55,6 @@ public:
         HandleCamera();
         
     }
-
 
     void HandleDragProcess()
     {
@@ -90,7 +88,7 @@ public:
         }
     }
 
-    void HandleHover(){
+    void HandleNodeHover(){
         // Hover node
         bool status = false;
         for(Node<T> *node : graph->GetNodes()){
@@ -194,7 +192,6 @@ public:
         }
     }
 
-
     void HandleReset(){
         if(IsKeyPressed(KEY_R)){
             delete graph;
@@ -203,7 +200,6 @@ public:
             std::cout << "Reset Done !" << std::endl;
         }
     }
-
 
 
 };

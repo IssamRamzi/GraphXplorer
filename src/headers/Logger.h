@@ -9,8 +9,10 @@
 #include <fstream>
 #include <iostream>
 #include <ctime>
+#include <deque>
 #include <sstream>
 #include <filesystem>
+#include <vector>
 
 enum LOG_LEVEL {
     DEBUG,
@@ -50,16 +52,20 @@ public:
         str << "[ " << timestamp << " ] - " << GetStringLogLevel(level) << " : " << message << std::endl;
         std::cout << str.str();
 
+        history.push_back(str.str());
         if (file.is_open()) {
             file << str.str();
             file.flush(); // write immediately
 
         }
     }
+
+    std::deque<std::string> GetLogHistory(){return history;}
+
 private:
     std::ofstream file;
+    std::deque<std::string> history;
 private:
-
     std::string GetStringLogLevel(LOG_LEVEL level) {
         switch (level) {
             case DEBUG: return "[ DEBUG ]";
